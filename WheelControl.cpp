@@ -15,7 +15,7 @@ volatile unsigned long readAnalogTimer[4];
 volatile unsigned long timerInt[4];
 volatile unsigned long timer2Int[4];
 volatile unsigned int wheelSpeedCount[4];
-boolean flagLow [4];   
+volatile boolean flagLow [4];   
 int wheelIdIncoderHighValue[4];
 int wheelIdIncoderLowValue[4];
 int  wheelIdAnalogEncoderInput[4];
@@ -107,7 +107,7 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 					saveWheelInterrupt[3] = 0;
 
 				}
-					noInterrupts(); // disable all interrupts
+				noInterrupts(); // disable all interrupts
 				TCCR3A = 0;  // set entire TCCR4A register to 0
 				TCCR3B = 0;  // set entire TCCR4B register to 0
 				TCNT3 = tcntWheel; // 
@@ -176,7 +176,6 @@ ISR(TIMER3_OVF_vect)        // timer interrupt used to regurarly check rotation
 		 
 		if (level > wheelIdIncoderHighValue[i] && flagLow[i] == true)  // one new hole detected
 			{
-
 			flagLow[i] = false;
 			if (wheelInterrupt[i]%wheelIdEncoderHoles[i]==0)  // get time for the first occurence
 			{
@@ -189,14 +188,15 @@ ISR(TIMER3_OVF_vect)        // timer interrupt used to regurarly check rotation
 			if (wheelInterrupt[i]%wheelIdEncoderHoles[i]==(wheelIdEncoderHoles[i]-1))  // get time for the last occurence
 			{
 				unsigned int deltaTime = millis() - timerInt[i];
-				lastTurnWheelSpeed[i]=float (1000)/deltaTime;
+				lastTurnWheelSpeed[i]=float (1000*(wheelIdEncoderHoles[i]-1)/wheelIdEncoderHoles[i])/deltaTime;
 				timerInt[i] = millis();
 			}
 			if (wheelInterrupt[i]%(2*wheelIdEncoderHoles[i])==((2*wheelIdEncoderHoles[i])-1))  // get time for the last occurence
 			{
 				unsigned int deltaTime = millis() - timer2Int[i];
-				last2TurnWheelSpeed[i]=2*float (1000)/(deltaTime);
+				last2TurnWheelSpeed[i]=float (1000*((2*wheelIdEncoderHoles[i])-1)*2/(2*wheelIdEncoderHoles[i]))/deltaTime;
 				timer2Int[i] = millis();
+
 			}
 	//		wheelSpeedCount[i]++;
 			wheelInterrupt[i]++;
