@@ -15,7 +15,10 @@ volatile unsigned long readAnalogTimer[4];
 volatile unsigned long timerInt[4];
 volatile unsigned long timer2Int[4];
 volatile unsigned int wheelSpeedCount[4];
+volatile boolean startHigh[4];
 volatile boolean flagLow [4];   
+volatile unsigned int minWheelLevel[4];
+volatile unsigned int maxWheelLevel[4];
 int wheelIdIncoderHighValue[4];
 int wheelIdIncoderLowValue[4];
 int  wheelIdAnalogEncoderInput[4];
@@ -73,6 +76,18 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 					last2TurnWheelSpeed[0] = 0;
 					wheelInterrupt[0] = 0;
 					saveWheelInterrupt[0] = 0;
+					flagLow[0]=false;
+					minWheelLevel[0]=1023;
+					maxWheelLevel[0]=0;
+					if (analogRead(wheelIdAnalogEncoderInput[0])> wheelIdIncoderHighValue[0])
+					{
+						startHigh[0]=true;           
+					}
+					else 
+					{
+						startHigh[0]=false;
+					}
+					
 				}
 				if (wheelId1ControlOn)
 				{
@@ -83,6 +98,17 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 					last2TurnWheelSpeed[1] = 0;
 					wheelInterrupt[1] = 0;
 					saveWheelInterrupt[1] = 0;
+					flagLow[1]=false;
+					minWheelLevel[1]=1023;
+					maxWheelLevel[1]=0;
+					if (analogRead(wheelIdAnalogEncoderInput[1])> wheelIdIncoderHighValue[1])  // do we started on high or low position
+					{
+						startHigh[1]=true;    
+					}
+					else 
+					{
+						startHigh[1]=false;
+					}
 
 				}
 				if (wheelId2ControlOn)
@@ -94,6 +120,17 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 					last2TurnWheelSpeed[2] = 0;
 					wheelInterrupt[2] = 0;
 					saveWheelInterrupt[2] = 0;
+					flagLow[2]=false;
+					minWheelLevel[2]=1023;
+					maxWheelLevel[2]=0;
+					if (analogRead(wheelIdAnalogEncoderInput[2])> wheelIdIncoderHighValue[2])
+					{
+						startHigh[2]=true;
+					}
+					else 
+					{
+						startHigh[2]=false;
+					}
 						
 				}
 				if (wheelId3ControlOn)
@@ -105,6 +142,17 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 					last2TurnWheelSpeed[3] = 0;
 					wheelInterrupt[3] = 0;
 					saveWheelInterrupt[3] = 0;
+					flagLow[3]=false;
+					minWheelLevel[3]=1023;
+					maxWheelLevel[3]=0;
+					if (analogRead(wheelIdAnalogEncoderInput[3])> wheelIdIncoderHighValue[3])
+					{
+						startHigh[3]=true;
+					}
+					else 
+					{
+						startHigh[3]=false;
+					}
 
 				}
 				noInterrupts(); // disable all interrupts
@@ -148,6 +196,14 @@ unsigned int  WheelControl::GetCurrentHolesCount(uint8_t wheelId)
 	{
 	return wheelInterrupt[wheelId];
 	}
+unsigned int  WheelControl::GetMinLevel(uint8_t wheelId)
+	{
+	return minWheelLevel[wheelId];
+	}
+unsigned int  WheelControl::GetMaxLevel(uint8_t wheelId)
+	{
+	return maxWheelLevel[wheelId];
+	}
 float WheelControl::GetLastTurnSpeed(uint8_t wheelId)
 	{
 	return lastTurnWheelSpeed[wheelId];
@@ -172,9 +228,34 @@ ISR(TIMER3_OVF_vect)        // timer interrupt used to regurarly check rotation
 	for (int i=0;i<4;i++)
 	{
 		 int level = analogRead(wheelIdAnalogEncoderInput[i]);
+		 if (level<minWheelLevel[i])
+		 {
+			minWheelLevel[i]=level;
+		 }
+		 if (level>maxWheelLevel[i])
+		 {
+			maxWheelLevel[i]=level;
+		 }
+
 	//	 readAnalogTimer[i] = micros();
-		 
-		if (level > wheelIdIncoderHighValue[i] && flagLow[i] == true)  // one new hole detected
+		boolean switchOn;
+		 if (level > wheelIdIncoderHighValue[i] && startHigh[i]==true)    // started high and high again 
+		 {
+			 switchOn=true;          
+		 }
+ 		 if (level > wheelIdIncoderHighValue[i] && startHigh[i]==false)  // started high and low now 
+		 {
+			 switchOn=false;
+		 }
+		 if (level < wheelIdIncoderLowValue[i] && startHigh[i]==false)    // started low and low again 
+		 {
+			 switchOn=true;
+		 }
+ 		 if (level < wheelIdIncoderLowValue[i] && startHigh[i]==true)     // started low and high now
+		 {
+			 switchOn=false;
+		 }
+		if (switchOn==true && flagLow[i] == true)  // one new hole detected
 			{
 			flagLow[i] = false;
 			if (wheelInterrupt[i]%wheelIdEncoderHoles[i]==0)  // get time for the first occurence
@@ -201,7 +282,7 @@ ISR(TIMER3_OVF_vect)        // timer interrupt used to regurarly check rotation
 	//		wheelSpeedCount[i]++;
 			wheelInterrupt[i]++;
 			}
-		if (level < wheelIdIncoderHighValue[i] && flagLow[i] == false)
+		if (switchOn==false && flagLow[i] == false)
 			{
 
 			flagLow[i] = true;

@@ -27,6 +27,8 @@ void StartWheelControl(
 void StopWheelControl(boolean wheelId0ControlOn, boolean wheelId1ControlOn, boolean wheelId2ControlOn, boolean wheelId3ControlOn);
 void ClearThershold(uint8_t wheelId);
 unsigned int GetCurrentHolesCount(uint8_t wheelId);
+unsigned int GetMinLevel(uint8_t  wheelId);
+unsigned int GetMaxLevel(uint8_t  wheelId);
 float GetLastTurnSpeed(uint8_t wheelId);
 float Get2LastTurnSpeed(uint8_t wheelId);
 uint8_t GetLastWheelInterruptId();
