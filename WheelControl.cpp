@@ -14,6 +14,7 @@ volatile unsigned long saveWheelInterrupt[4];
 volatile unsigned long readAnalogTimer[4];
 volatile unsigned long timerInt[4];
 volatile unsigned long timer2Int[4];
+volatile unsigned long microInt[4];
 volatile unsigned int wheelSpeedCount[4];
 volatile boolean startHigh[4];
 volatile boolean flagLow [4];   
@@ -22,6 +23,7 @@ volatile unsigned int maxWheelLevel[4];
 int wheelIdIncoderHighValue[4];
 int wheelIdIncoderLowValue[4];
 int  wheelIdAnalogEncoderInput[4];
+int _delayMiniBetweenHoles;
 unsigned int wheelIdLimitation[4];
 uint8_t softPinInterrupt;
 boolean wheelInterruptOn[4];
@@ -33,7 +35,7 @@ WheelControl::WheelControl (
 				uint8_t wheelId1EncoderHoles, int wheelId1IncoderHighValue ,int wheelId1IncoderLowValue, int wheelId1AnalogEncoderInput, 
 				uint8_t wheelId2EncoderHoles, int wheelId2IncoderHighValue ,int wheelId2IncoderLowValue, int wheelId2AnalogEncoderInput, 
 				uint8_t wheelId3EncoderHoles, int wheelId3IncoderHighValue ,int wheelId3IncoderLowValue, int wheelId3AnalogEncoderInput, 
-				uint8_t wheelPinInterrupt
+				uint8_t wheelPinInterrupt, int delayMiniBetweenHoles
 				)
 				
 			{
@@ -54,6 +56,7 @@ WheelControl::WheelControl (
 			wheelIdIncoderHighValue[3]=wheelId3IncoderHighValue;
 			wheelIdIncoderLowValue[3]=wheelId3IncoderLowValue;
 			softPinInterrupt=wheelPinInterrupt;
+			_delayMiniBetweenHoles=delayMiniBetweenHoles;
 			}
 void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0InterruptOn,unsigned int wheelId0Limitation,
 						boolean wheelId1ControlOn,boolean wheelId1InterruptOn,unsigned int wheelId1Limitation,
@@ -238,6 +241,8 @@ ISR(TIMER3_OVF_vect)        // timer interrupt used to regurarly check rotation
 		 }
 
 	//	 readAnalogTimer[i] = micros();
+	if (millis()-microInt[i]> _delayMiniBetweenHoles)    // if delay not big enough do nothing to avoid misreading
+	{
 		boolean switchOn;
 		 if (level > wheelIdIncoderHighValue[i] && startHigh[i]==true)    // started high and high again 
 		 {
@@ -257,6 +262,7 @@ ISR(TIMER3_OVF_vect)        // timer interrupt used to regurarly check rotation
 		 }
 		if (switchOn==true && flagLow[i] == true)  // one new hole detected
 			{
+			microInt[i]=millis();
 			flagLow[i] = false;
 			if (wheelInterrupt[i]%wheelIdEncoderHoles[i]==0)  // get time for the first occurence
 			{
@@ -297,7 +303,7 @@ ISR(TIMER3_OVF_vect)        // timer interrupt used to regurarly check rotation
 		}
 
 	}
-	
+	}
 
 #if defined(wheelEncoderDebugOn)
 

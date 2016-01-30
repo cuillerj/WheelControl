@@ -6,6 +6,7 @@
 #ifndef WheelControl_h_included
 #define WheelControl_h_included
 #define _sizeOfRevSpeedArray 8 //size of the array containing latest revolution wheel speed
+//#define delayMiniBetweenHoles  750
 class WheelControl
 {
 public:
@@ -14,7 +15,7 @@ WheelControl (
 				uint8_t wheelId1EncoderHoles, int wheelId1IncoderHighValue ,int wheelId1IncoderLowValue, int wheelId1AnalogEncoderInput, 
 				uint8_t wheelId2EncoderHoles, int wheelId2IncoderHighValue ,int wheelId2IncoderLowValue, int wheelId2AnalogEncoderInput, 
 				uint8_t wheelId3EncoderHoles, int wheelId3IncoderHighValue ,int wheelId3IncoderLowValue, int wheelId3AnalogEncoderInput, 
-				uint8_t wheelPinInterrupt
+				uint8_t wheelPinInterrupt, int delayMiniBetweenHoles
 			);
 				
 				
