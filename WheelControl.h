@@ -2,10 +2,10 @@
 
 */
 #include <Arduino.h>
-
 #ifndef WheelControl_h_included
 #define WheelControl_h_included
 #define _sizeOfRevSpeedArray 8 //size of the array containing latest revolution wheel speed
+//#define debugWheelControlOn true
 //#define delayMiniBetweenHoles  750
 class WheelControl
 {

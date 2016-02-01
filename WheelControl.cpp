@@ -297,8 +297,10 @@ ISR(TIMER3_OVF_vect)        // timer interrupt used to regurarly check rotation
 
 		{
 			lastWheelInterruptId=i;
-			Serial.print("thre:");
+#if defined(debugWheelControlOn)
+			Serial.print("threshold reached:");
 			Serial.println(wheelInterrupt[i]);
+#endif
 			digitalWrite(softPinInterrupt,HIGH);
 		}
 
