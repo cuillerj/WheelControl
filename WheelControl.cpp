@@ -3,7 +3,7 @@
 */
 #include <Arduino.h>
 #include "WheelControl.h"
-unsigned int tcntWheel=65000;   // used to init timer overflow for instance 49911 for 1s cycle (tous les 8/100eme s
+unsigned int tcntWheel=65100;   // used to init timer overflow for instance 49911 for 1s cycle (tous les 8/100eme s
 volatile float lastTurnWheelSpeed[4];
 volatile float last2TurnWheelSpeed[4];
 //volatile unsigned int instantWheelRevSpeed[_sizeOfRevSpeedArray*4];
@@ -159,11 +159,11 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 
 				}
 				noInterrupts(); // disable all interrupts
-				TCCR3A = 0;  // set entire TCCR4A register to 0
-				TCCR3B = 0;  // set entire TCCR4B register to 0
-				TCNT3 = tcntWheel; // 
-				TCCR3B |= ((1 << CS12) ); // 256 prescaler
-				TIMSK3 |= (1 << TOIE3); // enable timer overflow interrupt
+				TCCR5A = 0;  // set entire TCCR5A register to 0
+				TCCR5B = 0;  // set entire TCCR5B register to 0
+				TCNT5 = tcntWheel; // 
+				TCCR5B |= ((1 << CS12) ); // 256 prescaler
+				TIMSK5 |= (1 << TOIE5); // enable timer overflow interrupt
 				interrupts(); // enable all interrupts
 			}
 void WheelControl::StopWheelControl(boolean wheelId0ControlOn,	boolean wheelId1ControlOn,boolean wheelId2ControlOn,boolean wheelId3ControlOn)
@@ -193,7 +193,26 @@ void WheelControl::StopWheelControl(boolean wheelId0ControlOn,	boolean wheelId1C
 					wheelInterruptOn[3]=false;
 					wheelIdLimitation[3]=0;
 				}
-				
+				uint8_t countInt=0;
+				for (int i=0;i<4;i++)
+				{
+					if (wheelInterruptOn[i]==true)
+					{
+						countInt++;
+					}
+				}
+				if (countInt==0)  // stop timer
+				{
+									noInterrupts(); // disable all interrupts
+				TCCR5A = 0;  // set entire TCCR5A register to 0
+				TCCR5B = 0;  // set entire TCCR5B register to 0
+				TCNT5 = 0; // 
+				TCCR5B |= ((0 << CS10) ); // 
+				TCCR5B |= ((0 << CS11) ); //
+				TCCR5B |= ((0 << CS12) ); // 256 prescaler
+				TIMSK5 |= (0 << TOIE5); // enable timer overflow interrupt
+				interrupts(); // enable all interrupts
+				}
 			}
 unsigned int  WheelControl::GetCurrentHolesCount(uint8_t wheelId)
 	{
@@ -225,9 +244,9 @@ void WheelControl::ClearThershold(uint8_t wheelId)
 					wheelInterruptOn[wheelId]=false;
 
 }
-ISR(TIMER3_OVF_vect)        // timer interrupt used to regurarly check rotation
+ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 	{
-	TCNT3 = tcntWheel;            // preload timer to adjust duration
+	TCNT5 = tcntWheel;            // preload timer to adjust duration
 	for (int i=0;i<4;i++)
 	{
 		 int level = analogRead(wheelIdAnalogEncoderInput[i]);
