@@ -1,4 +1,18 @@
 /*
+can deal with up to 4 wheel encoders
+WheelControl () define the encoders configuration (number of holes, analog high and low value used to detect holes, analog pins,
+ pin used for interrupting main program and minimum delay between two holes detection
+
+StartWheelControl() start wheel control with encoders - for each encoder define if control is to be activated, if threashold to be detected 
+	and the threashold number of holes 
+	remain active till StopWheelControl is called
+
+StartWheelPulse() activate a pulse control corresponding to maximum number of time the timer interrupt code is executed After the main program is interrupted
+	automaticaly stopped 
+	
+StopWheelControl() selectively stop encoders control
+
+GetCurrentHolesCount() for each encoder provide the number of holes detected since the last StartWheelControl
 
 */
 #include <Arduino.h>
@@ -29,7 +43,9 @@ uint8_t softPinInterrupt;
 boolean wheelInterruptOn[4];
 uint8_t lastWheelInterruptId;
 int8_t wheelIdEncoderHoles[4];
-
+volatile unsigned int wheelPulseCount;
+boolean _controlOn=false;
+boolean _pulseOn=false;
 WheelControl::WheelControl (
 				uint8_t wheelId0EncoderHoles, int wheelId0IncoderHighValue, int wheelId0IncoderLowValue, int wheelId0AnalogEncoderInput,
 				uint8_t wheelId1EncoderHoles, int wheelId1IncoderHighValue ,int wheelId1IncoderLowValue, int wheelId1AnalogEncoderInput, 
@@ -65,6 +81,7 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 			)
 			{
 				_controlOn=true;
+				_pulseOn=false;
 				 if (softPinInterrupt!=0)
 					{
 					pinMode(softPinInterrupt,OUTPUT);
@@ -166,9 +183,43 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 				TIMSK5 |= (1 << TOIE5); // enable timer overflow interrupt
 				interrupts(); // enable all interrupts
 			}
+void WheelControl::StartWheelPulse(unsigned int pulseLimitation)
+
+			{
+				_pulseOn=true;
+				_controlOn=false;
+				if (softPinInterrupt!=0)
+				{
+					pinMode(softPinInterrupt,OUTPUT);
+					digitalWrite(softPinInterrupt,LOW);
+				}
+
+					wheelIdLimitation[0]=pulseLimitation;
+					wheelPulseCount = 0;
+					flagLow[0]=false;
+					minWheelLevel[0]=1023;
+					maxWheelLevel[0]=0;
+					if (analogRead(wheelIdAnalogEncoderInput[0])> wheelIdIncoderHighValue[0])
+					{
+						startHigh[0]=true;           
+					}
+					else 
+					{
+						startHigh[0]=false;
+					}
+
+								noInterrupts(); // disable all interrupts
+				TCCR5A = 0;  // set entire TCCR5A register to 0
+				TCCR5B = 0;  // set entire TCCR5B register to 0
+				TCNT5 = tcntWheel; // 
+				TCCR5B |= ((1 << CS12) ); // 256 prescaler
+				TIMSK5 |= (1 << TOIE5); // enable timer overflow interrupt
+				interrupts(); // enable all interrupts
+			}
 void WheelControl::StopWheelControl(boolean wheelId0ControlOn,	boolean wheelId1ControlOn,boolean wheelId2ControlOn,boolean wheelId3ControlOn)
 			{
 				_controlOn=false;
+				_pulseOn=false;
 				if (wheelId0ControlOn)
 				{
 					_wheelControlOn[0]=false;
@@ -203,7 +254,7 @@ void WheelControl::StopWheelControl(boolean wheelId0ControlOn,	boolean wheelId1C
 				}
 				if (countInt==0)  // stop timer
 				{
-									noInterrupts(); // disable all interrupts
+				noInterrupts(); // disable all interrupts
 				TCCR5A = 0;  // set entire TCCR5A register to 0
 				TCCR5B = 0;  // set entire TCCR5B register to 0
 				TCNT5 = 0; // 
@@ -245,88 +296,116 @@ void WheelControl::ClearThershold(uint8_t wheelId)
 
 }
 ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
-	{
+{
 	TCNT5 = tcntWheel;            // preload timer to adjust duration
-	for (int i=0;i<4;i++)
+	if (_controlOn==true)
 	{
-		 int level = analogRead(wheelIdAnalogEncoderInput[i]);
-		 if (level<minWheelLevel[i])
-		 {
-			minWheelLevel[i]=level;
-		 }
-		 if (level>maxWheelLevel[i])
-		 {
-			maxWheelLevel[i]=level;
-		 }
-
-	//	 readAnalogTimer[i] = micros();
-	if (millis()-microInt[i]> _delayMiniBetweenHoles)    // if delay not big enough do nothing to avoid misreading
-	{
-		boolean switchOn;
-		 if (level > wheelIdIncoderHighValue[i] && startHigh[i]==true)    // started high and high again 
-		 {
-			 switchOn=true;          
-		 }
- 		 if (level > wheelIdIncoderHighValue[i] && startHigh[i]==false)  // started high and low now 
-		 {
-			 switchOn=false;
-		 }
-		 if (level < wheelIdIncoderLowValue[i] && startHigh[i]==false)    // started low and low again 
-		 {
-			 switchOn=true;
-		 }
- 		 if (level < wheelIdIncoderLowValue[i] && startHigh[i]==true)     // started low and high now
-		 {
-			 switchOn=false;
-		 }
-		if (switchOn==true && flagLow[i] == true)  // one new hole detected
-			{
-			microInt[i]=millis();
-			flagLow[i] = false;
-			if (wheelInterrupt[i]%wheelIdEncoderHoles[i]==0)  // get time for the first occurence
-			{
-				timerInt[i] = millis();
-			}
-			if (wheelInterrupt[i]%(2*wheelIdEncoderHoles[i])==0)  // get time for the first occurence
-			{
-				timer2Int[i] = millis();
-			}
-			if (wheelInterrupt[i]%wheelIdEncoderHoles[i]==(wheelIdEncoderHoles[i]-1))  // get time for the last occurence
-			{
-				unsigned int deltaTime = millis() - timerInt[i];
-				lastTurnWheelSpeed[i]=float (1000*(wheelIdEncoderHoles[i]-1)/wheelIdEncoderHoles[i])/deltaTime;
-				timerInt[i] = millis();
-			}
-			if (wheelInterrupt[i]%(2*wheelIdEncoderHoles[i])==((2*wheelIdEncoderHoles[i])-1))  // get time for the last occurence
-			{
-				unsigned int deltaTime = millis() - timer2Int[i];
-				last2TurnWheelSpeed[i]=float (1000*((2*wheelIdEncoderHoles[i])-1)*2/(2*wheelIdEncoderHoles[i]))/deltaTime;
-				timer2Int[i] = millis();
-
-			}
-	//		wheelSpeedCount[i]++;
-			wheelInterrupt[i]++;
-			}
-		if (switchOn==false && flagLow[i] == false)
-			{
-
-			flagLow[i] = true;
-			}
-		if (wheelInterrupt[i]>=wheelIdLimitation[i] && wheelIdLimitation[i]!=0 && wheelInterruptOn[i] == true)
-
+		for (int i=0;i<4;i++)
 		{
-			lastWheelInterruptId=i;
-#if defined(debugWheelControlOn)
-			Serial.print("threshold reached:");
-			Serial.println(wheelInterrupt[i]);
-#endif
-			digitalWrite(softPinInterrupt,HIGH);
+			 int level = analogRead(wheelIdAnalogEncoderInput[i]);
+			 if (level<minWheelLevel[i])
+			 {
+				minWheelLevel[i]=level;
+			 }
+			 if (level>maxWheelLevel[i])
+			 {
+				maxWheelLevel[i]=level;
+			 }
+
+		//	 readAnalogTimer[i] = micros();
+		if (millis()-microInt[i]> _delayMiniBetweenHoles)    // if delay not big enough do nothing to avoid misreading
+		{
+			boolean switchOn;
+			 if (level > wheelIdIncoderHighValue[i] && startHigh[i]==true)    // started high and high again 
+			 {
+				 switchOn=true;          
+			 }
+			 if (level > wheelIdIncoderHighValue[i] && startHigh[i]==false)  // started high and low now 
+			 {
+				 switchOn=false;
+			 }
+			 if (level < wheelIdIncoderLowValue[i] && startHigh[i]==false)    // started low and low again 
+			 {
+				 switchOn=true;
+			 }
+			 if (level < wheelIdIncoderLowValue[i] && startHigh[i]==true)     // started low and high now
+			 {
+				 switchOn=false;
+			 }
+			if (switchOn==true && flagLow[i] == true)  // one new hole detected
+			{
+				if(_controlOn==true)
+				{
+					microInt[i]=millis();
+					flagLow[i] = false;
+					if (wheelInterrupt[i]%wheelIdEncoderHoles[i]==0)  // get time for the first occurence
+					{
+						timerInt[i] = millis();
+					}
+					if (wheelInterrupt[i]%(2*wheelIdEncoderHoles[i])==0)  // get time for the first occurence
+					{
+						timer2Int[i] = millis();
+					}
+					if (wheelInterrupt[i]%wheelIdEncoderHoles[i]==(wheelIdEncoderHoles[i]-1))  // get time for the last occurence
+					{
+						unsigned int deltaTime = millis() - timerInt[i];
+						lastTurnWheelSpeed[i]=float (1000*(wheelIdEncoderHoles[i]-1)/wheelIdEncoderHoles[i])/deltaTime;
+						timerInt[i] = millis();
+					}
+					if (wheelInterrupt[i]%(2*wheelIdEncoderHoles[i])==((2*wheelIdEncoderHoles[i])-1))  // get time for the last occurence
+					{
+						unsigned int deltaTime = millis() - timer2Int[i];
+						last2TurnWheelSpeed[i]=float (1000*((2*wheelIdEncoderHoles[i])-1)*2/(2*wheelIdEncoderHoles[i]))/deltaTime;
+						timer2Int[i] = millis();
+
+					}
+			//		wheelSpeedCount[i]++;
+					wheelInterrupt[i]++;
+				}
+
+			}
+			if (switchOn==false && flagLow[i] == false)
+				{
+
+				flagLow[i] = true;
+				}
+			if (wheelInterrupt[i]>=wheelIdLimitation[i] && wheelIdLimitation[i]!=0 && wheelInterruptOn[i] == true)
+
+			{
+				lastWheelInterruptId=i;
+	#if defined(debugWheelControlOn)
+				Serial.print("threshold reached:");
+				Serial.println(wheelInterrupt[i]);
+	#endif
+				digitalWrite(softPinInterrupt,HIGH);
+			}
+
 		}
-
-	}
 	}
 
-#if defined(wheelEncoderDebugOn)
-
-#endif
+	}
+		if (_pulseOn==true)
+		{
+			wheelPulseCount++;
+			if (wheelPulseCount>=wheelIdLimitation[0])
+			{
+				lastWheelInterruptId=5;
+				noInterrupts(); // disable all interrupts
+				TCCR5A = 0;  // set entire TCCR5A register to 0
+				TCCR5B = 0;  // set entire TCCR5B register to 0
+				TCNT5 = 0; // 
+				TCCR5B |= ((0 << CS10) ); // 
+				TCCR5B |= ((0 << CS11) ); //
+				TCCR5B |= ((0 << CS12) ); // 256 prescaler
+				TIMSK5 |= (0 << TOIE5); // enable timer overflow interrupt
+				interrupts(); // enable all interrupts
+				_pulseOn=false;
+//#if defined(debugWheelControlOn)
+				Serial.print("Pulse reached:");
+				Serial.println(wheelPulseCount);
+//	#endif
+				
+				digitalWrite(softPinInterrupt,HIGH);
+			}
+		}
 }
