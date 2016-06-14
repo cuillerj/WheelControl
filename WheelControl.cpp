@@ -156,8 +156,8 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 				if (wheelId3ControlOn)
 				{
 					_wheelControlOn[3]=true;
-					wheelInterruptOn[3]=wheelId1InterruptOn;
-					wheelIdLimitation[3]=wheelId1Limitation;
+					wheelInterruptOn[3]=wheelId3InterruptOn;
+					wheelIdLimitation[3]=wheelId3Limitation;
 					lastTurnWheelSpeed[3] = 0;
 					last2TurnWheelSpeed[3] = 0;
 					wheelInterrupt[3] = 0;
@@ -285,11 +285,15 @@ float WheelControl::Get2LastTurnSpeed(uint8_t wheelId)
 	{
 	return last2TurnWheelSpeed[wheelId];
 	}
+unsigned int WheelControl::GetWheelThreshold(uint8_t wheelId)
+	{
+	return wheelIdLimitation[wheelId];
+	}
 uint8_t WheelControl::GetLastWheelInterruptId()
 	{
 	return(lastWheelInterruptId);
 	}
-void WheelControl::ClearThershold(uint8_t wheelId)
+void WheelControl::ClearThreshold(uint8_t wheelId)
 {
 
 					wheelInterruptOn[wheelId]=false;
