@@ -1,5 +1,6 @@
 /*
 I developed a library for Arduino that is free of usage.
+This software has been tested on ATmega2560 
 Software is designed to handle from 1 to 4 decoders simultaneously. It works asynchronously of the main code. 
 The main code has to initialize some parameters and then can start the encoder control independently of each others . 
 When a requested threshold expressed in number of holes will be reached  the main code will be interrupt by the library code and will be able to act accordingly.

@@ -106,8 +106,7 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 					else 
 					{
 						startHigh[0]=false;
-					}
-					
+					}					
 				}
 				if (wheelId1ControlOn)
 				{
@@ -218,8 +217,8 @@ void WheelControl::StartWheelPulse(unsigned int pulseLimitation)
 			}
 void WheelControl::StopWheelControl(boolean wheelId0ControlOn,	boolean wheelId1ControlOn,boolean wheelId2ControlOn,boolean wheelId3ControlOn)
 			{
-				_controlOn=false;
-				_pulseOn=false;
+//				_controlOn=false;
+//				_pulseOn=false;
 				if (wheelId0ControlOn)
 				{
 					_wheelControlOn[0]=false;
@@ -252,6 +251,7 @@ void WheelControl::StopWheelControl(boolean wheelId0ControlOn,	boolean wheelId1C
 						countInt++;
 					}
 				}
+//				Serial.println(countInt);
 				if (countInt==0)  // stop timer
 				{
 				noInterrupts(); // disable all interrupts
@@ -263,6 +263,8 @@ void WheelControl::StopWheelControl(boolean wheelId0ControlOn,	boolean wheelId1C
 				TCCR5B |= ((0 << CS12) ); // 256 prescaler
 				TIMSK5 |= (0 << TOIE5); // enable timer overflow interrupt
 				interrupts(); // enable all interrupts
+				_controlOn=false;
+//				_pulseOn=false;
 				}
 			}
 unsigned int  WheelControl::GetCurrentHolesCount(uint8_t wheelId)
@@ -295,9 +297,8 @@ uint8_t WheelControl::GetLastWheelInterruptId()
 	}
 void WheelControl::ClearThreshold(uint8_t wheelId)
 {
-
-					wheelInterruptOn[wheelId]=false;
-
+	wheelInterruptOn[wheelId]=false;
+	wheelIdLimitation[wheelId]=0;
 }
 ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 {
@@ -370,7 +371,6 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 			}
 			if (switchOn==false && flagLow[i] == false)
 				{
-
 				flagLow[i] = true;
 				}
 			if (wheelInterrupt[i]>=wheelIdLimitation[i] && wheelIdLimitation[i]!=0 && wheelInterruptOn[i] == true)
