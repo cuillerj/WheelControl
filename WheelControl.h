@@ -1,12 +1,49 @@
 /*
+I developed a library for Arduino that is free of usage.
+Software is designed to handle from 1 to 4 decoders simultaneously. It works asynchronously of the main code. 
+The main code has to initialize some parameters and then can start the encoder control independently of each others . 
+When a requested threshold expressed in number of holes will be reached  the main code will be interrupt by the library code and will be able to act accordingly.
 
+WheelControl () is used to define the object (before the setup())
+	for each x encoder
+		wheelIdxEncoderHoles must contain the number of holes of the x encoder
+		wheelIdxIncoderHighValue must contain the threshold  (result of analogRead of the x encoder output) over that encoder input is high (meaning IR receiver can not see IR emitter)
+		wheelIdxIncoderLowValue must contain the threshold  (result of analogRead of the x encoder output) under that encoder input is low (meaning IR receiver can not see IR emitter)
+		wheelIdxAnalogEncoderInput must contain the analog Arduino input connected to the x encoder output
+		set 0 if not used
+	wheelPinInterrupt must contain the software PIN used to interrupt main code (look at the Arduino documention to choose one)
+	delayMiniBetweenHoles must contain the minimum duration in micro seconds between two encoder holes at the maximum speed 
+		for instance if the maximim wheel RPM is 120 and the number of holes encoder is 8 it means: 2 turns x 8 holes / second = 62.5 ms >> set delayMiniBetweenHoles below 62.5 => 50
+
+StartWheelControl() is used to start encoder control
+	for each x encoder
+		wheelIdxControlOn true to activate the x encoder control / false not to use the x encoder control
+		wheelIdxInterruptOn true to activate the interrupt for x encoder  / false not to use the interrupt for the x encoder control
+			wheelIdxControlOn must be true if wheelIdxInterruptOn is true
+		wheelIdxLimitation must contain the threshold number of holes that will provide the interrupt
+			wheelIdxInterruptOn must be true if wheelIdxLimitation is not equal 0
+	it is possible to call multiple time StartWheelControl() to start different encoder without previously stopping 
+	
+StopWheelControl() is used to stop encoder control	
+	for each x encoder
+		wheelIdxControlOn true to stop the x encoder control / false to let x encoder in the previous state
+		it is possible to call multiple time StartWheelControl() to stop different encoder
+
+GetWheelThreshold(x) will return the current x encoder threshold
+ClearThreshold(x) is used to clear x encoder threshold
+GetCurrentHolesCount(x) will return the current number of holes for the x encoder since the previous start
+GetLastTurnSpeed(x) will return the last trun speed for the x encoder
+Get2LastTurnSpeed(x) will return the average last two turns speed for the x encoder
+GetLastWheelInterruptId() will return the last encoder number that provide an interrupt
+
+StartWheelPulse(pulseLimitation) act as a simple timer - pulseLimitation is the duration after that the main code will be interrupt.
+	can be used to turn a little bit the motor (encoders are not used)
 */
 #include <Arduino.h>
 #ifndef WheelControl_h_included
 #define WheelControl_h_included
 #define _sizeOfRevSpeedArray 8 //size of the array containing latest revolution wheel speed
-//#define debugWheelControlOn true
-//#define delayMiniBetweenHoles  750
+
 class WheelControl
 {
 public:
