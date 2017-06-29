@@ -66,6 +66,7 @@ void StartWheelControl(
 void StartWheelPulse(unsigned int pulseLimitation);
 void StopWheelControl(boolean wheelId0ControlOn, boolean wheelId1ControlOn, boolean wheelId2ControlOn, boolean wheelId3ControlOn);
 void ClearThreshold(uint8_t wheelId);
+void IncreaseThreshold(uint8_t wheelId, unsigned int pulseIncrease );
 unsigned int GetCurrentHolesCount(uint8_t wheelId);
 unsigned int GetMinLevel(uint8_t  wheelId);
 unsigned int GetMaxLevel(uint8_t  wheelId);

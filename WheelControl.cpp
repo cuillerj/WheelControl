@@ -15,6 +15,7 @@ StopWheelControl() selectively stop encoders control
 GetCurrentHolesCount() for each encoder provide the number of holes detected since the last StartWheelControl
 
 */
+//#define debugWheelControlOn
 #include <Arduino.h>
 #include "WheelControl.h"
 unsigned int tcntWheel=65100;   // used to init timer overflow for instance 49911 for 1s cycle (tous les 8/100eme s
@@ -38,7 +39,7 @@ int wheelIdIncoderHighValue[4];
 int wheelIdIncoderLowValue[4];
 int  wheelIdAnalogEncoderInput[4];
 int _delayMiniBetweenHoles;
-unsigned int wheelIdLimitation[4];
+volatile unsigned int wheelIdLimitation[4];
 uint8_t softPinInterrupt;
 boolean wheelInterruptOn[4];
 uint8_t lastWheelInterruptId;
@@ -267,6 +268,17 @@ void WheelControl::StopWheelControl(boolean wheelId0ControlOn,	boolean wheelId1C
 //				_pulseOn=false;
 				}
 			}
+void WheelControl::IncreaseThreshold(uint8_t wheelId, unsigned int pulseIncrease )
+
+			{
+					wheelIdLimitation[wheelId]=wheelIdLimitation[wheelId]+pulseIncrease;
+	#if defined(debugWheelControlOn)
+					Serial.print("increase limit:");
+					Serial.print(wheelId);
+					Serial.print("-");					
+					Serial.println(wheelIdLimitation[wheelId]);
+	#endif
+			}			
 unsigned int  WheelControl::GetCurrentHolesCount(uint8_t wheelId)
 	{
 	return wheelInterrupt[wheelId];
@@ -379,6 +391,8 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 				lastWheelInterruptId=i;
 	#if defined(debugWheelControlOn)
 				Serial.print("threshold reached:");
+				Serial.print(i);
+				Serial.print("-");
 				Serial.println(wheelInterrupt[i]);
 	#endif
 				digitalWrite(softPinInterrupt,HIGH);
@@ -404,10 +418,10 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 				TIMSK5 |= (0 << TOIE5); // enable timer overflow interrupt
 				interrupts(); // enable all interrupts
 				_pulseOn=false;
-//#if defined(debugWheelControlOn)
+#if defined(debugWheelControlOn)
 				Serial.print("Pulse reached:");
 				Serial.println(wheelPulseCount);
-//	#endif
+	#endif
 				
 				digitalWrite(softPinInterrupt,HIGH);
 			}
