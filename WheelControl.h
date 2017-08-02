@@ -74,7 +74,7 @@ float GetLastTurnSpeed(uint8_t wheelId);
 float Get2LastTurnSpeed(uint8_t wheelId);
 unsigned int GetWheelThreshold(uint8_t wheelId);
 uint8_t GetLastWheelInterruptId();
-boolean _wheelControlOn[4];
+
 
 };
     

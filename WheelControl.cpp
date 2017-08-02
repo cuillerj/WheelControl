@@ -47,6 +47,7 @@ int8_t wheelIdEncoderHoles[4];
 volatile unsigned int wheelPulseCount;
 boolean _controlOn=false;
 boolean _pulseOn=false;
+volatile boolean _wheelControlOn[4];
 WheelControl::WheelControl (
 				uint8_t wheelId0EncoderHoles, int wheelId0IncoderHighValue, int wheelId0IncoderLowValue, int wheelId0AnalogEncoderInput,
 				uint8_t wheelId1EncoderHoles, int wheelId1IncoderHighValue ,int wheelId1IncoderLowValue, int wheelId1AnalogEncoderInput, 
@@ -317,91 +318,94 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 	TCNT5 = tcntWheel;            // preload timer to adjust duration
 	if (_controlOn==true)
 	{
-		for (int i=0;i<4;i++)
-		{
-			 int level = analogRead(wheelIdAnalogEncoderInput[i]);
-			 if (level<minWheelLevel[i])
-			 {
-				minWheelLevel[i]=level;
-			 }
-			 if (level>maxWheelLevel[i])
-			 {
-				maxWheelLevel[i]=level;
-			 }
-
-		//	 readAnalogTimer[i] = micros();
-		if (millis()-microInt[i]> _delayMiniBetweenHoles)    // if delay not big enough do nothing to avoid misreading
-		{
-			boolean switchOn;
-			 if (level > wheelIdIncoderHighValue[i] && startHigh[i]==true)    // started high and high again 
-			 {
-				 switchOn=true;          
-			 }
-			 if (level > wheelIdIncoderHighValue[i] && startHigh[i]==false)  // started high and low now 
-			 {
-				 switchOn=false;
-			 }
-			 if (level < wheelIdIncoderLowValue[i] && startHigh[i]==false)    // started low and low again 
-			 {
-				 switchOn=true;
-			 }
-			 if (level < wheelIdIncoderLowValue[i] && startHigh[i]==true)     // started low and high now
-			 {
-				 switchOn=false;
-			 }
-			if (switchOn==true && flagLow[i] == true)  // one new hole detected
+			for (int i=0;i<4;i++)
 			{
-				if(_controlOn==true)
+				if (_wheelControlOn[i])
 				{
-					microInt[i]=millis();
-					flagLow[i] = false;
-					if (wheelInterrupt[i]%wheelIdEncoderHoles[i]==0)  // get time for the first occurence
+					 int level = analogRead(wheelIdAnalogEncoderInput[i]);
+					 if (level<minWheelLevel[i])
+					 {
+						minWheelLevel[i]=level;
+					 }
+					 if (level>maxWheelLevel[i])
+					 {
+						maxWheelLevel[i]=level;
+					 }
+
+				//	 readAnalogTimer[i] = micros();
+					if (millis()-microInt[i]> _delayMiniBetweenHoles)    // if delay not big enough do nothing to avoid misreading
 					{
-						timerInt[i] = millis();
-					}
-					if (wheelInterrupt[i]%(2*wheelIdEncoderHoles[i])==0)  // get time for the first occurence
-					{
-						timer2Int[i] = millis();
-					}
-					if (wheelInterrupt[i]%wheelIdEncoderHoles[i]==(wheelIdEncoderHoles[i]-1))  // get time for the last occurence
-					{
-						unsigned int deltaTime = millis() - timerInt[i];
-						lastTurnWheelSpeed[i]=float (1000*(wheelIdEncoderHoles[i]-1)/wheelIdEncoderHoles[i])/deltaTime;
-						timerInt[i] = millis();
-					}
-					if (wheelInterrupt[i]%(2*wheelIdEncoderHoles[i])==((2*wheelIdEncoderHoles[i])-1))  // get time for the last occurence
-					{
-						unsigned int deltaTime = millis() - timer2Int[i];
-						last2TurnWheelSpeed[i]=float (1000*((2*wheelIdEncoderHoles[i])-1)*2/(2*wheelIdEncoderHoles[i]))/deltaTime;
-						timer2Int[i] = millis();
+						boolean switchOn;
+						 if (level > wheelIdIncoderHighValue[i] && startHigh[i]==true)    // started high and high again 
+						 {
+							 switchOn=true;          
+						 }
+						 if (level > wheelIdIncoderHighValue[i] && startHigh[i]==false)  // started high and low now 
+						 {
+							 switchOn=false;
+						 }
+						 if (level < wheelIdIncoderLowValue[i] && startHigh[i]==false)    // started low and low again 
+						 {
+							 switchOn=true;
+						 }
+						 if (level < wheelIdIncoderLowValue[i] && startHigh[i]==true)     // started low and high now
+						 {
+							 switchOn=false;
+						 }
+						if (switchOn==true && flagLow[i] == true)  // one new hole detected
+						{
+							if(_controlOn==true)
+							{
+								microInt[i]=millis();
+								flagLow[i] = false;
+								if (wheelInterrupt[i]%wheelIdEncoderHoles[i]==0)  // get time for the first occurence
+								{
+									timerInt[i] = millis();
+								}
+								if (wheelInterrupt[i]%(2*wheelIdEncoderHoles[i])==0)  // get time for the first occurence
+								{
+									timer2Int[i] = millis();
+								}
+								if (wheelInterrupt[i]%wheelIdEncoderHoles[i]==(wheelIdEncoderHoles[i]-1))  // get time for the last occurence
+								{
+									unsigned int deltaTime = millis() - timerInt[i];
+									lastTurnWheelSpeed[i]=float (1000*(wheelIdEncoderHoles[i]-1)/wheelIdEncoderHoles[i])/deltaTime;
+									timerInt[i] = millis();
+								}
+								if (wheelInterrupt[i]%(2*wheelIdEncoderHoles[i])==((2*wheelIdEncoderHoles[i])-1))  // get time for the last occurence
+								{
+									unsigned int deltaTime = millis() - timer2Int[i];
+									last2TurnWheelSpeed[i]=float (1000*((2*wheelIdEncoderHoles[i])-1)*2/(2*wheelIdEncoderHoles[i]))/deltaTime;
+									timer2Int[i] = millis();
+
+								}
+						//		wheelSpeedCount[i]++;
+								wheelInterrupt[i]++;
+							}
+
+						}
+						if (switchOn==false && flagLow[i] == false)
+							{
+							flagLow[i] = true;
+							}
+						if (wheelInterrupt[i]>=wheelIdLimitation[i] && wheelIdLimitation[i]!=0 && wheelInterruptOn[i] == true)
+
+						{
+							lastWheelInterruptId=i;
+				#if defined(debugWheelControlOn)
+							Serial.print("threshold reached:");
+							Serial.print(i);
+							Serial.print("-");
+							Serial.println(wheelInterrupt[i]);
+				#endif
+							digitalWrite(softPinInterrupt,HIGH);
+						}
 
 					}
-			//		wheelSpeedCount[i]++;
-					wheelInterrupt[i]++;
 				}
-
 			}
-			if (switchOn==false && flagLow[i] == false)
-				{
-				flagLow[i] = true;
-				}
-			if (wheelInterrupt[i]>=wheelIdLimitation[i] && wheelIdLimitation[i]!=0 && wheelInterruptOn[i] == true)
-
-			{
-				lastWheelInterruptId=i;
-	#if defined(debugWheelControlOn)
-				Serial.print("threshold reached:");
-				Serial.print(i);
-				Serial.print("-");
-				Serial.println(wheelInterrupt[i]);
-	#endif
-				digitalWrite(softPinInterrupt,HIGH);
-			}
-
 		}
-	}
-
-	}
+	
 		if (_pulseOn==true)
 		{
 			wheelPulseCount++;
