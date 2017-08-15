@@ -82,6 +82,9 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 						boolean wheelId3ControlOn,boolean wheelId3InterruptOn,unsigned int wheelId3Limitation
 			)
 			{
+#if defined(debugWheelControlOn)
+		Serial.println("StartWheelControl");
+#endif
 				_controlOn=true;
 				_pulseOn=false;
 				 if (softPinInterrupt!=0)
@@ -221,6 +224,9 @@ void WheelControl::StopWheelControl(boolean wheelId0ControlOn,	boolean wheelId1C
 			{
 //				_controlOn=false;
 //				_pulseOn=false;
+#if defined(debugWheelControlOn)
+		Serial.println("StopWheelControl");
+#endif
 				if (wheelId0ControlOn)
 				{
 					_wheelControlOn[0]=false;
@@ -316,12 +322,19 @@ void WheelControl::ClearThreshold(uint8_t wheelId)
 ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 {
 	TCNT5 = tcntWheel;            // preload timer to adjust duration
+#if defined(debugWheelControlOn)
+
+#endif
 	if (_controlOn==true)
 	{
 			for (int i=0;i<4;i++)
 			{
 				if (_wheelControlOn[i])
 				{
+#if defined(debugWheelControlOn)
+	Serial.print("~");
+	Serial.println(i);
+#endif
 					 int level = analogRead(wheelIdAnalogEncoderInput[i]);
 					 if (level<minWheelLevel[i])
 					 {
