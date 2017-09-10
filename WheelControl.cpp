@@ -179,11 +179,14 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 					}
 
 				}
+	/*
+	set timer 5 interrupt parameters
+	*/
 				noInterrupts(); // disable all interrupts
 				TCCR5A = 0;  // set entire TCCR5A register to 0
 				TCCR5B = 0;  // set entire TCCR5B register to 0
 				TCNT5 = tcntWheel; // 
-				TCCR5B |= ((1 << CS12) ); // 256 prescaler
+				TCCR5B |= ((1 << CS12) ); // 256 prescaler - frequency=16,000,000Hz/256
 				TIMSK5 |= (1 << TOIE5); // enable timer overflow interrupt
 				interrupts(); // enable all interrupts
 			}
