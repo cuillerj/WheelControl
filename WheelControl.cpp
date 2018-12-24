@@ -39,6 +39,7 @@ int wheelIdIncoderHighValue[4];
 int wheelIdIncoderLowValue[4];
 int  wheelIdAnalogEncoderInput[4];
 int _delayMiniBetweenHoles;
+int _delayMaxBetweenHoles;
 volatile unsigned int wheelIdLimitation[4];
 uint8_t softPinInterrupt;
 boolean wheelInterruptOn[4];
@@ -53,7 +54,7 @@ WheelControl::WheelControl (
 				uint8_t wheelId1EncoderHoles, int wheelId1IncoderHighValue ,int wheelId1IncoderLowValue, int wheelId1AnalogEncoderInput, 
 				uint8_t wheelId2EncoderHoles, int wheelId2IncoderHighValue ,int wheelId2IncoderLowValue, int wheelId2AnalogEncoderInput, 
 				uint8_t wheelId3EncoderHoles, int wheelId3IncoderHighValue ,int wheelId3IncoderLowValue, int wheelId3AnalogEncoderInput, 
-				uint8_t wheelPinInterrupt, int delayMiniBetweenHoles
+				uint8_t wheelPinInterrupt, int delayMiniBetweenHoles, int delayMaxBetweenHoles
 				)
 				
 			{
@@ -74,7 +75,8 @@ WheelControl::WheelControl (
 			wheelIdIncoderHighValue[3]=wheelId3IncoderHighValue;
 			wheelIdIncoderLowValue[3]=wheelId3IncoderLowValue;
 			softPinInterrupt=wheelPinInterrupt;
-			_delayMiniBetweenHoles=delayMiniBetweenHoles;
+			_delayMiniBetweenHoles=delayMiniBetweenHoles/3;
+			_delayMaxBetweenHoles=delayMaxBetweenHoles;
 			}
 void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0InterruptOn,unsigned int wheelId0Limitation,
 						boolean wheelId1ControlOn,boolean wheelId1InterruptOn,unsigned int wheelId1Limitation,
@@ -349,7 +351,7 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 					 }
 
 				//	 readAnalogTimer[i] = micros();
-					if (millis()-microInt[i]> _delayMiniBetweenHoles)    // if delay not big enough do nothing to avoid misreading
+					if (millis()-microInt[i]> _delayMiniBetweenHoles)    //  delay not big enough do nothing to avoid misreading
 					{
 						boolean switchOn;
 						 if (level > wheelIdIncoderHighValue[i] && startHigh[i]==true)    // started high and high again 
@@ -398,7 +400,12 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 						//		wheelSpeedCount[i]++;
 								wheelInterrupt[i]++;
 							}
-
+						}
+						else{
+							if(millis()-microInt[i]> _delayMaxBetweenHoles){
+								last2TurnWheelSpeed[i]=lastTurnWheelSpeed[i];
+								lastTurnWheelSpeed[i]=lastTurnWheelSpeed[i]/2;
+							}
 						}
 						if (switchOn==false && flagLow[i] == false)
 							{
