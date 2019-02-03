@@ -171,7 +171,7 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 					flagLow[3]=false;
 					minWheelLevel[3]=1023;
 					maxWheelLevel[3]=0;
-					if (analogRead(wheelIdAnalogEncoderInput[3])> wheelIdIncoderHighValue[3])
+					if (analogRead(wheelIdAnalogEncoderInput[3])> wheelIdIncoderHighValue[4])
 					{
 						startHigh[3]=true;
 					}
