@@ -35,19 +35,19 @@ volatile boolean startHigh[4];
 volatile boolean flagLow [4];   
 volatile unsigned int minWheelLevel[4];
 volatile unsigned int maxWheelLevel[4];
-int wheelIdIncoderHighValue[4];
-int wheelIdIncoderLowValue[4];
-int  wheelIdAnalogEncoderInput[4];
+volatile int wheelIdIncoderHighValue[4];
+volatile int wheelIdIncoderLowValue[4];
+volatile int  wheelIdAnalogEncoderInput[4];
 int _delayMiniBetweenHoles;
 int _delayMaxBetweenHoles;
 volatile unsigned int wheelIdLimitation[4];
 uint8_t softPinInterrupt;
-boolean wheelInterruptOn[4];
-uint8_t lastWheelInterruptId;
-int8_t wheelIdEncoderHoles[4];
+volatile boolean wheelInterruptOn[4];
+volatile uint8_t lastWheelInterruptId;
+uint8_t wheelIdEncoderHoles[4];
 volatile unsigned int wheelPulseCount;
-boolean _controlOn=false;
-boolean _pulseOn=false;
+volatile boolean _controlOn=false;
+volatile boolean _pulseOn=false;
 volatile boolean _wheelControlOn[4];
 WheelControl::WheelControl (
 				uint8_t wheelId0EncoderHoles, int wheelId0IncoderHighValue, int wheelId0IncoderLowValue, int wheelId0AnalogEncoderInput,
@@ -75,7 +75,7 @@ WheelControl::WheelControl (
 			wheelIdIncoderHighValue[3]=wheelId3IncoderHighValue;
 			wheelIdIncoderLowValue[3]=wheelId3IncoderLowValue;
 			softPinInterrupt=wheelPinInterrupt;
-			_delayMiniBetweenHoles=delayMiniBetweenHoles/3;
+			_delayMiniBetweenHoles=delayMiniBetweenHoles/2;
 			_delayMaxBetweenHoles=delayMaxBetweenHoles;
 			}
 void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0InterruptOn,unsigned int wheelId0Limitation,
@@ -92,7 +92,7 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 				 if (softPinInterrupt!=0)
 					{
 					pinMode(softPinInterrupt,OUTPUT);
-					digitalWrite(softPinInterrupt,LOW);
+					digitalWrite(softPinInterrupt,HIGH);
 					}
 				if (wheelId0ControlOn)
 				{
@@ -200,7 +200,7 @@ void WheelControl::StartWheelPulse(unsigned int pulseLimitation)
 				if (softPinInterrupt!=0)
 				{
 					pinMode(softPinInterrupt,OUTPUT);
-					digitalWrite(softPinInterrupt,LOW);
+					digitalWrite(softPinInterrupt,HIGH);
 				}
 
 					wheelIdLimitation[0]=pulseLimitation;
@@ -336,11 +336,12 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 			{
 				if (_wheelControlOn[i])
 				{
-#if defined(debugWheelControlOn)
-	Serial.print("~");
-	Serial.println(i);
-#endif
+
 					 int level = analogRead(wheelIdAnalogEncoderInput[i]);
+					 delayMicroseconds(5);
+					 level = level+analogRead(wheelIdAnalogEncoderInput[i]); // multiple read added 13/03/2019 to improve reliability
+					 delayMicroseconds(5);
+					 level = (level+analogRead(wheelIdAnalogEncoderInput[i]))/3;
 					 if (level<minWheelLevel[i])
 					 {
 						minWheelLevel[i]=level;
@@ -366,12 +367,16 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 						 {
 							 switchOn=true;
 						 }
-						 if (level < wheelIdIncoderLowValue[i] && startHigh[i]==true)     // started low and high now
+						 if (level < wheelIdIncoderLowValue[i] && startHigh[i]==true)     // started high and low now
 						 {
 							 switchOn=false;
 						 }
 						if (switchOn==true && flagLow[i] == true)  // one new hole detected
 						{
+#if defined(debugWheelControlOn)
+	Serial.print("~");
+	Serial.println(i);
+#endif
 							if(_controlOn==true)
 							{
 								microInt[i]=millis();
@@ -412,7 +417,6 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 							flagLow[i] = true;
 							}
 						if (wheelInterrupt[i]>=wheelIdLimitation[i] && wheelIdLimitation[i]!=0 && wheelInterruptOn[i] == true)
-
 						{
 							lastWheelInterruptId=i;
 				#if defined(debugWheelControlOn)
@@ -421,7 +425,8 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 							Serial.print("-");
 							Serial.println(wheelInterrupt[i]);
 				#endif
-							digitalWrite(softPinInterrupt,HIGH);
+							digitalWrite(softPinInterrupt,LOW);
+							wheelInterruptOn[i]=false;     // no more interrupt needed
 						}
 
 					}
@@ -450,7 +455,7 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 				Serial.println(wheelPulseCount);
 	#endif
 				
-				digitalWrite(softPinInterrupt,HIGH);
+				digitalWrite(softPinInterrupt,LOW);
 			}
 		}
 }
