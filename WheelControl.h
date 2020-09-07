@@ -1,6 +1,6 @@
 /*
 I developed a library for Arduino that is free of usage.
-This software has been tested on ATmega2560 
+This software has been developped for ATmega2560 
 Software is designed to handle from 1 to 4 decoders simultaneously. It works asynchronously of the main code. 
 The main code has to initialize some parameters and then can start the encoder control independently of each others . 
 When a requested threshold expressed in number of holes will be reached  the main code will be interrupt by the library code and will be able to act accordingly.
@@ -33,9 +33,13 @@ StopWheelControl() is used to stop encoder control
 GetWheelThreshold(x) will return the current x encoder threshold
 ClearThreshold(x) is used to clear x encoder threshold
 GetCurrentHolesCount(x) will return the current number of holes for the x encoder since the previous start
-GetLastTurnSpeed(x) will return the last trun speed for the x encoder
+GetLastTurnSpeed(x) will return the last turnspeed for the x encoder
 Get2LastTurnSpeed(x) will return the average last two turns speed for the x encoder
-GetLastWheelInterruptId() will return the last encoder number that provide an interrupt
+GetLastWheelInterruptId(x) will return the last encoder number that provide an interrupt
+GetInstantTurnSpeed(x) will return the instant turn speed for the x encoder
+GetTurnSpeed(x) will return the mitigate turn speed for the x encoder
+GetWheeLowValue(x) will return the lowest analog value for the x encoder since the last StartWheelControl
+GetWheeHighValue(x) will return the highest analog value for the x encoder since the last StartWheelControl
 
 StartWheelPulse(pulseLimitation) act as a simple timer - pulseLimitation is the duration after that the main code will be interrupt.
 	can be used to turn a little bit the motor (encoders are not used)
@@ -43,7 +47,6 @@ StartWheelPulse(pulseLimitation) act as a simple timer - pulseLimitation is the 
 #include <Arduino.h>
 #ifndef WheelControl_h_included
 #define WheelControl_h_included
-#define _sizeOfRevSpeedArray 8 //size of the array containing latest revolution wheel speed
 
 class WheelControl
 {
@@ -53,7 +56,7 @@ WheelControl (
 				uint8_t wheelId1EncoderHoles, int wheelId1IncoderHighValue ,int wheelId1IncoderLowValue, int wheelId1AnalogEncoderInput, 
 				uint8_t wheelId2EncoderHoles, int wheelId2IncoderHighValue ,int wheelId2IncoderLowValue, int wheelId2AnalogEncoderInput, 
 				uint8_t wheelId3EncoderHoles, int wheelId3IncoderHighValue ,int wheelId3IncoderLowValue, int wheelId3AnalogEncoderInput, 
-				uint8_t wheelPinInterrupt, int delayMiniBetweenHoles, int delayMaxBetweenHoles
+				uint8_t wheelPinInterrupt, float delayMiniBetweenHoles
 			);
 				
 				
@@ -72,10 +75,12 @@ unsigned int GetMinLevel(uint8_t  wheelId);
 unsigned int GetMaxLevel(uint8_t  wheelId);
 float GetLastTurnSpeed(uint8_t wheelId);
 float Get2LastTurnSpeed(uint8_t wheelId);
+float GetInstantTurnSpeed(uint8_t wheelId);
+float GetTurnSpeed(uint8_t wheelId);
 unsigned int GetWheelThreshold(uint8_t wheelId);
 uint8_t GetLastWheelInterruptId();
-
-
+unsigned int GetWheeLowValue(uint8_t wheelId); 
+unsigned int GetWheeHighValue(uint8_t wheelId); 
 };
     
 #endif

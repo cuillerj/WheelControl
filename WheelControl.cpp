@@ -1,27 +1,22 @@
 /*
-can deal with up to 4 wheel encoders
-WheelControl () define the encoders configuration (number of holes, analog high and low value used to detect holes, analog pins,
- pin used for interrupting main program and minimum delay between two holes detection
+use interrupt number 5
 
-StartWheelControl() start wheel control with encoders - for each encoder define if control is to be activated, if threashold to be detected 
-	and the threashold number of holes 
-	remain active till StopWheelControl is called
-
-StartWheelPulse() activate a pulse control corresponding to maximum number of time the timer interrupt code is executed After the main program is interrupted
-	automaticaly stopped 
-	
-StopWheelControl() selectively stop encoders control
-
-GetCurrentHolesCount() for each encoder provide the number of holes detected since the last StartWheelControl
 
 */
-//#define debugWheelControlOn
+
+//#define debugWheelControlOn  // uncomment to enter debug mode
 #include <Arduino.h>
 #include "WheelControl.h"
-unsigned int tcntWheel=65100;   // used to init timer overflow for instance 49911 for 1s cycle (tous les 8/100eme s
+#define instantSpeedSize 4   // instant speed mesurment holes size
+#define sampleFreqRatio 10  // sampling 10 times the mini duration between 2 holes
+#define tcntWheelMin 65000  // 65535-tcntWheelMin determine the minimum interrupt freqency
+#define tcntWheelMax 65530  // 65535-tcntWheelMax determine the maximum interrupt freqency
+#define speedBias 0.95      // used to adjust GetTurnSpeed according to mesurment bias
+unsigned int tcntWheel = tcntWheelMin;   // used to init timer overflow for instance 49911 for 1s cycle (tous les 8/100eme s
 volatile float lastTurnWheelSpeed[4];
 volatile float last2TurnWheelSpeed[4];
-//volatile unsigned int instantWheelRevSpeed[_sizeOfRevSpeedArray*4];
+volatile long instantTurnSpeed[4][instantSpeedSize];
+volatile unsigned int instantIdx[4];
 volatile unsigned long prevWheelInterrupt[4];
 volatile unsigned long prevWheelIntTime[4];
 volatile unsigned long wheelInterrupt[4];
@@ -35,11 +30,10 @@ volatile boolean startHigh[4];
 volatile boolean flagLow [4];   
 volatile unsigned int minWheelLevel[4];
 volatile unsigned int maxWheelLevel[4];
-volatile int wheelIdIncoderHighValue[4];
-volatile int wheelIdIncoderLowValue[4];
+unsigned int wheelIdIncoderHighValue[4];  
+unsigned int wheelIdIncoderLowValue[4];
 volatile int  wheelIdAnalogEncoderInput[4];
 int _delayMiniBetweenHoles;
-int _delayMaxBetweenHoles;
 volatile unsigned int wheelIdLimitation[4];
 uint8_t softPinInterrupt;
 volatile boolean wheelInterruptOn[4];
@@ -54,7 +48,7 @@ WheelControl::WheelControl (
 				uint8_t wheelId1EncoderHoles, int wheelId1IncoderHighValue ,int wheelId1IncoderLowValue, int wheelId1AnalogEncoderInput, 
 				uint8_t wheelId2EncoderHoles, int wheelId2IncoderHighValue ,int wheelId2IncoderLowValue, int wheelId2AnalogEncoderInput, 
 				uint8_t wheelId3EncoderHoles, int wheelId3IncoderHighValue ,int wheelId3IncoderLowValue, int wheelId3AnalogEncoderInput, 
-				uint8_t wheelPinInterrupt, int delayMiniBetweenHoles, int delayMaxBetweenHoles
+				uint8_t wheelPinInterrupt, float delayMiniBetweenHoles
 				)
 				
 			{
@@ -76,7 +70,9 @@ WheelControl::WheelControl (
 			wheelIdIncoderLowValue[3]=wheelId3IncoderLowValue;
 			softPinInterrupt=wheelPinInterrupt;
 			_delayMiniBetweenHoles=delayMiniBetweenHoles/2;
-			_delayMaxBetweenHoles=delayMaxBetweenHoles;
+			tcntWheel = 65535 - delayMiniBetweenHoles *65535./10000; // for sampling at least 10 times between 2 holes 
+			tcntWheel = min(tcntWheel, tcntWheelMax);
+			tcntWheel = max(tcntWheel, tcntWheelMin);
 			}
 void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0InterruptOn,unsigned int wheelId0Limitation,
 						boolean wheelId1ControlOn,boolean wheelId1InterruptOn,unsigned int wheelId1Limitation,
@@ -101,6 +97,10 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 					wheelIdLimitation[0]=wheelId0Limitation;
 					lastTurnWheelSpeed[0] = 0;
 					last2TurnWheelSpeed[0] = 0;
+					for (int i = 0;i < instantSpeedSize;i++) {
+						instantTurnSpeed[0][i] = 0;
+					}
+					instantIdx[0] = 0;
 					wheelInterrupt[0] = 0;
 					saveWheelInterrupt[0] = 0;
 					flagLow[0]=false;
@@ -122,6 +122,10 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 					wheelIdLimitation[1]=wheelId1Limitation;
 					lastTurnWheelSpeed[1] = 0;
 					last2TurnWheelSpeed[1] = 0;
+					for (int i = 0;i < instantSpeedSize;i++) {
+						instantTurnSpeed[1][i] = 0;
+					}
+					instantIdx[1] = 0;
 					wheelInterrupt[1] = 0;
 					saveWheelInterrupt[1] = 0;
 					flagLow[1]=false;
@@ -144,6 +148,10 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 					wheelIdLimitation[2]=wheelId2Limitation;
 					lastTurnWheelSpeed[2] = 0;
 					last2TurnWheelSpeed[2] = 0;
+					for (int i = 0;i < instantSpeedSize;i++) {
+						instantTurnSpeed[2][i] = 0;
+					}
+					instantIdx[2] = 0;
 					wheelInterrupt[2] = 0;
 					saveWheelInterrupt[2] = 0;
 					flagLow[2]=false;
@@ -166,6 +174,10 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 					wheelIdLimitation[3]=wheelId3Limitation;
 					lastTurnWheelSpeed[3] = 0;
 					last2TurnWheelSpeed[3] = 0;
+					for (int i = 0;i < instantSpeedSize;i++) {
+						instantTurnSpeed[3][i] = 0;
+					}
+					instantIdx[3] = 0;
 					wheelInterrupt[3] = 0;
 					saveWheelInterrupt[3] = 0;
 					flagLow[3]=false;
@@ -187,8 +199,8 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 				noInterrupts(); // disable all interrupts
 				TCCR5A = 0;  // set entire TCCR5A register to 0
 				TCCR5B = 0;  // set entire TCCR5B register to 0
-				TCNT5 = tcntWheel; // 
-				TCCR5B |= ((1 << CS12) ); // 256 prescaler - frequency=16,000,000Hz/256
+				TCNT5 = tcntWheel; // sampling frequency = 64Khz/(65535-tcntWheel)
+				TCCR5B |= ((1 << CS12) ); // 256 prescaler - frequency=16,000,000Hz/256 >> frequency=64KHz
 				TIMSK5 |= (1 << TOIE5); // enable timer overflow interrupt
 				interrupts(); // enable all interrupts
 			}
@@ -217,7 +229,7 @@ void WheelControl::StartWheelPulse(unsigned int pulseLimitation)
 						startHigh[0]=false;
 					}
 
-								noInterrupts(); // disable all interrupts
+				noInterrupts(); // disable all interrupts
 				TCCR5A = 0;  // set entire TCCR5A register to 0
 				TCCR5B = 0;  // set entire TCCR5B register to 0
 				TCNT5 = tcntWheel; // 
@@ -227,8 +239,6 @@ void WheelControl::StartWheelPulse(unsigned int pulseLimitation)
 			}
 void WheelControl::StopWheelControl(boolean wheelId0ControlOn,	boolean wheelId1ControlOn,boolean wheelId2ControlOn,boolean wheelId3ControlOn)
 			{
-//				_controlOn=false;
-//				_pulseOn=false;
 #if defined(debugWheelControlOn)
 		Serial.println("StopWheelControl");
 #endif
@@ -264,7 +274,6 @@ void WheelControl::StopWheelControl(boolean wheelId0ControlOn,	boolean wheelId1C
 						countInt++;
 					}
 				}
-//				Serial.println(countInt);
 				if (countInt==0)  // stop timer
 				{
 				noInterrupts(); // disable all interrupts
@@ -277,7 +286,6 @@ void WheelControl::StopWheelControl(boolean wheelId0ControlOn,	boolean wheelId1C
 				TIMSK5 |= (0 << TOIE5); // enable timer overflow interrupt
 				interrupts(); // enable all interrupts
 				_controlOn=false;
-//				_pulseOn=false;
 				}
 			}
 void WheelControl::IncreaseThreshold(uint8_t wheelId, unsigned int pulseIncrease )
@@ -293,35 +301,71 @@ void WheelControl::IncreaseThreshold(uint8_t wheelId, unsigned int pulseIncrease
 			}			
 unsigned int  WheelControl::GetCurrentHolesCount(uint8_t wheelId)
 	{
-	return wheelInterrupt[wheelId];
+		return wheelInterrupt[wheelId];
 	}
 unsigned int  WheelControl::GetMinLevel(uint8_t wheelId)
 	{
-	return minWheelLevel[wheelId];
+		return minWheelLevel[wheelId];
 	}
 unsigned int  WheelControl::GetMaxLevel(uint8_t wheelId)
 	{
-	return maxWheelLevel[wheelId];
+		return maxWheelLevel[wheelId];
 	}
 float WheelControl::GetLastTurnSpeed(uint8_t wheelId)
 	{
-	return lastTurnWheelSpeed[wheelId];
+		if (lastTurnWheelSpeed[wheelId] == 0) {
+			return GetInstantTurnSpeed(wheelId);
+		}
+		else {
+			return lastTurnWheelSpeed[wheelId];
+		}
 	}
 float WheelControl::Get2LastTurnSpeed(uint8_t wheelId)
-	{
-	return last2TurnWheelSpeed[wheelId];
+		{
+		if (last2TurnWheelSpeed[wheelId] == 0) {
+			return GetLastTurnSpeed(wheelId);
+		}
+		else {
+			return last2TurnWheelSpeed[wheelId];
+		}
 	}
+float WheelControl::GetTurnSpeed(uint8_t wheelId)
+{
+	float speed = ((GetLastTurnSpeed(wheelId) + 2*Get2LastTurnSpeed(wheelId) + GetInstantTurnSpeed(wheelId)) / 4)* speedBias;
+		return speed;
+}
+float WheelControl::GetInstantTurnSpeed(uint8_t wheelId)
+{
+	float speed = 0;
+	unsigned long deltaTime = 0;
+	if (wheelInterrupt[wheelId] > instantSpeedSize) {
+		deltaTime=(instantTurnSpeed[wheelId][(instantIdx[wheelId] - 1) % instantSpeedSize] - instantTurnSpeed[wheelId][instantIdx[wheelId]]);
+	}
+	deltaTime = deltaTime / (instantSpeedSize-1);
+	if (deltaTime != 0) {
+		speed = (1000. / (deltaTime * wheelIdEncoderHoles[wheelId]));
+	}
+	return speed;
+}
+
 unsigned int WheelControl::GetWheelThreshold(uint8_t wheelId)
 	{
 	return wheelIdLimitation[wheelId];
 	}
+unsigned int WheelControl::GetWheeLowValue(uint8_t wheelId)
+{
+	return wheelIdIncoderLowValue[wheelId];
+}
+unsigned int WheelControl::GetWheeHighValue(uint8_t wheelId)
+{
+	return wheelIdIncoderHighValue[wheelId];
+}
 uint8_t WheelControl::GetLastWheelInterruptId()
 	{
 	return(lastWheelInterruptId);
 	}
 void WheelControl::ClearThreshold(uint8_t wheelId)
 {
-	wheelInterruptOn[wheelId]=false;
 	wheelIdLimitation[wheelId]=0;
 }
 ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
@@ -338,10 +382,6 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 				{
 
 					 int level = analogRead(wheelIdAnalogEncoderInput[i]);
-					 delayMicroseconds(5);
-					 level = level+analogRead(wheelIdAnalogEncoderInput[i]); // multiple read added 13/03/2019 to improve reliability
-					 delayMicroseconds(5);
-					 level = (level+analogRead(wheelIdAnalogEncoderInput[i]))/3;
 					 if (level<minWheelLevel[i])
 					 {
 						minWheelLevel[i]=level;
@@ -350,11 +390,9 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 					 {
 						maxWheelLevel[i]=level;
 					 }
-
-				//	 readAnalogTimer[i] = micros();
 					if (millis()-microInt[i]> _delayMiniBetweenHoles)    //  delay not big enough do nothing to avoid misreading
 					{
-						boolean switchOn;
+						boolean switchOn=false;  
 						 if (level > wheelIdIncoderHighValue[i] && startHigh[i]==true)    // started high and high again 
 						 {
 							 switchOn=true;          
@@ -381,35 +419,26 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 							{
 								microInt[i]=millis();
 								flagLow[i] = false;
-								if (wheelInterrupt[i]%wheelIdEncoderHoles[i]==0)  // get time for the first occurence
-								{
-									timerInt[i] = millis();
-								}
-								if (wheelInterrupt[i]%(2*wheelIdEncoderHoles[i])==0)  // get time for the first occurence
-								{
-									timer2Int[i] = millis();
-								}
+
 								if (wheelInterrupt[i]%wheelIdEncoderHoles[i]==(wheelIdEncoderHoles[i]-1))  // get time for the last occurence
 								{
-									unsigned int deltaTime = millis() - timerInt[i];
-									lastTurnWheelSpeed[i]=float (1000*(wheelIdEncoderHoles[i]-1)/wheelIdEncoderHoles[i])/deltaTime;
+									lastTurnWheelSpeed[i] = float(1000. / (millis() - timerInt[i]));
+								}
+								if (wheelInterrupt[i]%(2*wheelIdEncoderHoles[i])==(2*wheelIdEncoderHoles[i]-1))  // get time for the last occurence
+								{
+									last2TurnWheelSpeed[i] = float(2000. / (millis() - timer2Int[i]));
+								}
+								if (wheelInterrupt[i] % wheelIdEncoderHoles[i] == 0)  // get time for the first occurence
+								{
 									timerInt[i] = millis();
 								}
-								if (wheelInterrupt[i]%(2*wheelIdEncoderHoles[i])==((2*wheelIdEncoderHoles[i])-1))  // get time for the last occurence
+								if (wheelInterrupt[i] % (2 * wheelIdEncoderHoles[i]) == 0)  // get time for the first occurence
 								{
-									unsigned int deltaTime = millis() - timer2Int[i];
-									last2TurnWheelSpeed[i]=float (1000*((2*wheelIdEncoderHoles[i])-1)*2/(2*wheelIdEncoderHoles[i]))/deltaTime;
 									timer2Int[i] = millis();
-
-								}
-						//		wheelSpeedCount[i]++;
+								}							
+								instantTurnSpeed[i][instantIdx[i]] = microInt[i];
+								instantIdx[i] = (instantIdx[i]+1) % instantSpeedSize;
 								wheelInterrupt[i]++;
-							}
-						}
-						else{
-							if(millis()-microInt[i]> _delayMaxBetweenHoles){
-								last2TurnWheelSpeed[i]=lastTurnWheelSpeed[i];
-								lastTurnWheelSpeed[i]=lastTurnWheelSpeed[i]/2;
 							}
 						}
 						if (switchOn==false && flagLow[i] == false)
@@ -428,7 +457,6 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 							digitalWrite(softPinInterrupt,LOW);
 							wheelInterruptOn[i]=false;     // no more interrupt needed
 						}
-
 					}
 				}
 			}
