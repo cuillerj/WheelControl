@@ -30,6 +30,7 @@ volatile boolean startHigh[4];
 volatile boolean flagLow [4];   
 volatile unsigned int minWheelLevel[4];
 volatile unsigned int maxWheelLevel[4];
+volatile unsigned int prevTurnHolesCount[4];
 unsigned int wheelIdIncoderHighValue[4];  
 unsigned int wheelIdIncoderLowValue[4];
 volatile int  wheelIdAnalogEncoderInput[4];
@@ -49,8 +50,7 @@ WheelControl::WheelControl (
 				uint8_t wheelId2EncoderHoles, int wheelId2IncoderHighValue ,int wheelId2IncoderLowValue, int wheelId2AnalogEncoderInput, 
 				uint8_t wheelId3EncoderHoles, int wheelId3IncoderHighValue ,int wheelId3IncoderLowValue, int wheelId3AnalogEncoderInput, 
 				uint8_t wheelPinInterrupt, float delayMiniBetweenHoles
-				)
-				
+				)			
 			{
 			wheelIdEncoderHoles[0]=wheelId0EncoderHoles;
 			wheelIdAnalogEncoderInput[0]=wheelId0AnalogEncoderInput;
@@ -69,7 +69,7 @@ WheelControl::WheelControl (
 			wheelIdIncoderHighValue[3]=wheelId3IncoderHighValue;
 			wheelIdIncoderLowValue[3]=wheelId3IncoderLowValue;
 			softPinInterrupt=wheelPinInterrupt;
-			_delayMiniBetweenHoles=delayMiniBetweenHoles/2;
+			_delayMiniBetweenHoles=delayMiniBetweenHoles/1.5;
 			tcntWheel = 65535 - delayMiniBetweenHoles *65535./10000; // for sampling at least 10 times between 2 holes 
 			tcntWheel = min(tcntWheel, tcntWheelMax);
 			tcntWheel = max(tcntWheel, tcntWheelMin);
@@ -331,8 +331,12 @@ float WheelControl::Get2LastTurnSpeed(uint8_t wheelId)
 	}
 float WheelControl::GetTurnSpeed(uint8_t wheelId)
 {
-	float speed = ((GetLastTurnSpeed(wheelId) + 2*Get2LastTurnSpeed(wheelId) + GetInstantTurnSpeed(wheelId)) / 4)* speedBias;
-		return speed;
+	float speed = ((GetLastTurnSpeed(wheelId) + 2 * Get2LastTurnSpeed(wheelId) + GetInstantTurnSpeed(wheelId)) / 4) * speedBias;
+	if (prevTurnHolesCount[wheelId] == GetCurrentHolesCount(wheelId)) {
+		speed = 0;
+	}
+	prevTurnHolesCount[wheelId] = GetCurrentHolesCount(wheelId);
+	return speed;
 }
 float WheelControl::GetInstantTurnSpeed(uint8_t wheelId)
 {
