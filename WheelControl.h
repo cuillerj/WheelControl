@@ -15,6 +15,7 @@ WheelControl () is used to define the object (before the setup())
 	wheelPinInterrupt must contain the software PIN used to interrupt main code (look at the Arduino documention to choose one)
 	delayMiniBetweenHoles must contain the minimum duration in micro seconds between two encoder holes at the maximum speed 
 		for instance if the maximim wheel RPM is 120 and the number of holes encoder is 8 it means: 2 turns x 8 holes / second = 62.5 ms >> set delayMiniBetweenHoles below 62.5 => 50
+	samplingRatio increase sampling frequency to adjust electrical characteristics VS signal as long high as low - too low we will lost holes too high we will consume unusefull CPU
 
 StartWheelControl() is used to start encoder control
 	for each x encoder
@@ -56,7 +57,7 @@ WheelControl (
 				uint8_t wheelId1EncoderHoles, int wheelId1IncoderHighValue ,int wheelId1IncoderLowValue, int wheelId1AnalogEncoderInput, 
 				uint8_t wheelId2EncoderHoles, int wheelId2IncoderHighValue ,int wheelId2IncoderLowValue, int wheelId2AnalogEncoderInput, 
 				uint8_t wheelId3EncoderHoles, int wheelId3IncoderHighValue ,int wheelId3IncoderLowValue, int wheelId3AnalogEncoderInput, 
-				uint8_t wheelPinInterrupt, float delayMiniBetweenHoles
+				uint8_t wheelPinInterrupt, float delayMiniBetweenHoles,float samplingRatio
 			);
 				
 				

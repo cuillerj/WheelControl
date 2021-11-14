@@ -8,10 +8,11 @@ use interrupt number 5
 #include <Arduino.h>
 #include "WheelControl.h"
 #define instantSpeedSize 4   // instant speed mesurment holes size
-#define sampleFreqRatio 10  // sampling 10 times the mini duration between 2 holes
 #define tcntWheelMin 65000  // 65535-tcntWheelMin determine the minimum interrupt freqency
-#define tcntWheelMax 65530  // 65535-tcntWheelMax determine the maximum interrupt freqency
+//#define tcntWheelMax 65530  // 65535-tcntWheelMax determine the maximum interrupt freqency
+#define tcntWheelMax 65500  // 65535-tcntWheelMax determine the maximum interrupt freqency
 #define speedBias 0.95      // used to adjust GetTurnSpeed according to mesurment bias
+
 unsigned int tcntWheel = tcntWheelMin;   // used to init timer overflow for instance 49911 for 1s cycle (tous les 8/100eme s
 volatile float lastTurnWheelSpeed[4];
 volatile float last2TurnWheelSpeed[4];
@@ -49,7 +50,7 @@ WheelControl::WheelControl (
 				uint8_t wheelId1EncoderHoles, int wheelId1IncoderHighValue ,int wheelId1IncoderLowValue, int wheelId1AnalogEncoderInput, 
 				uint8_t wheelId2EncoderHoles, int wheelId2IncoderHighValue ,int wheelId2IncoderLowValue, int wheelId2AnalogEncoderInput, 
 				uint8_t wheelId3EncoderHoles, int wheelId3IncoderHighValue ,int wheelId3IncoderLowValue, int wheelId3AnalogEncoderInput, 
-				uint8_t wheelPinInterrupt, float delayMiniBetweenHoles
+				uint8_t wheelPinInterrupt, float delayMiniBetweenHoles,float samplingRatio
 				)			
 			{
 			wheelIdEncoderHoles[0]=wheelId0EncoderHoles;
@@ -69,10 +70,11 @@ WheelControl::WheelControl (
 			wheelIdIncoderHighValue[3]=wheelId3IncoderHighValue;
 			wheelIdIncoderLowValue[3]=wheelId3IncoderLowValue;
 			softPinInterrupt=wheelPinInterrupt;
-			_delayMiniBetweenHoles=delayMiniBetweenHoles/1.5;
-			tcntWheel = 65535 - delayMiniBetweenHoles *65535./10000; // for sampling at least 10 times between 2 holes 
+			_delayMiniBetweenHoles=delayMiniBetweenHoles/2.5;
+			tcntWheel = 65535 - delayMiniBetweenHoles/ samplingRatio *65535./10000; // for sampling at least 10 times between 2 holes 
+//			tcntWheel = min(tcntWheel, tcntWheelMax);
+//			tcntWheel = max(tcntWheel, tcntWheelMin);
 			tcntWheel = min(tcntWheel, tcntWheelMax);
-			tcntWheel = max(tcntWheel, tcntWheelMin);
 			}
 void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0InterruptOn,unsigned int wheelId0Limitation,
 						boolean wheelId1ControlOn,boolean wheelId1InterruptOn,unsigned int wheelId1Limitation,
@@ -113,7 +115,8 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 					else 
 					{
 						startHigh[0]=false;
-					}					
+					}
+					microInt[0] = millis();
 				}
 				if (wheelId1ControlOn)
 				{
@@ -139,7 +142,7 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 					{
 						startHigh[1]=false;
 					}
-
+					microInt[1] = millis();
 				}
 				if (wheelId2ControlOn)
 				{
@@ -165,7 +168,7 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 					{
 						startHigh[2]=false;
 					}
-						
+					microInt[2] = millis();
 				}
 				if (wheelId3ControlOn)
 				{
@@ -191,7 +194,7 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 					{
 						startHigh[3]=false;
 					}
-
+					microInt[3] = millis();
 				}
 	/*
 	set timer 5 interrupt parameters
@@ -332,9 +335,9 @@ float WheelControl::Get2LastTurnSpeed(uint8_t wheelId)
 float WheelControl::GetTurnSpeed(uint8_t wheelId)
 {
 	float speed = ((GetLastTurnSpeed(wheelId) + 2 * Get2LastTurnSpeed(wheelId) + GetInstantTurnSpeed(wheelId)) / 4) * speedBias;
-	if (prevTurnHolesCount[wheelId] == GetCurrentHolesCount(wheelId)) {
-		speed = 0;
-	}
+	//if (prevTurnHolesCount[wheelId] == GetCurrentHolesCount(wheelId)) {
+	//	speed = 0;
+	//}
 	prevTurnHolesCount[wheelId] = GetCurrentHolesCount(wheelId);
 	return speed;
 }
@@ -384,7 +387,6 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 			{
 				if (_wheelControlOn[i])
 				{
-
 					 int level = analogRead(wheelIdAnalogEncoderInput[i]);
 					 if (level<minWheelLevel[i])
 					 {
@@ -396,7 +398,7 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 					 }
 					if (millis()-microInt[i]> _delayMiniBetweenHoles)    //  delay not big enough do nothing to avoid misreading
 					{
-						boolean switchOn=false;  
+						volatile boolean switchOn=false;  
 						 if (level > wheelIdIncoderHighValue[i] && startHigh[i]==true)    // started high and high again 
 						 {
 							 switchOn=true;          
