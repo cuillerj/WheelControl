@@ -49,6 +49,7 @@ StartWheelPulse(pulseLimitation) act as a simple timer - pulseLimitation is the 
 #ifndef WheelControl_h_included
 #define WheelControl_h_included
 
+
 class WheelControl
 {
 public:
@@ -82,6 +83,8 @@ unsigned int GetWheelThreshold(uint8_t wheelId);
 uint8_t GetLastWheelInterruptId();
 unsigned int GetWheeLowValue(uint8_t wheelId); 
 unsigned int GetWheeHighValue(uint8_t wheelId); 
+
+
 };
     
 #endif

@@ -3,11 +3,10 @@ use interrupt number 5
 
 
 */
-
 //#define debugWheelControlOn  // uncomment to enter debug mode
 #include <Arduino.h>
 #include "WheelControl.h"
-#define instantSpeedSize 4   // instant speed mesurment holes size
+#define instantSpeedSize 8   // instant speed mesurment holes size
 #define tcntWheelMin 65000  // 65535-tcntWheelMin determine the minimum interrupt freqency
 //#define tcntWheelMax 65530  // 65535-tcntWheelMax determine the maximum interrupt freqency
 #define tcntWheelMax 65500  // 65535-tcntWheelMax determine the maximum interrupt freqency
@@ -186,7 +185,7 @@ void WheelControl::StartWheelControl(boolean wheelId0ControlOn, boolean wheelId0
 					flagLow[3]=false;
 					minWheelLevel[3]=1023;
 					maxWheelLevel[3]=0;
-					if (analogRead(wheelIdAnalogEncoderInput[3])> wheelIdIncoderHighValue[4])
+					if (analogRead(wheelIdAnalogEncoderInput[3])> wheelIdIncoderHighValue[3])
 					{
 						startHigh[3]=true;
 					}
@@ -250,24 +249,40 @@ void WheelControl::StopWheelControl(boolean wheelId0ControlOn,	boolean wheelId1C
 					_wheelControlOn[0]=false;
 					wheelInterruptOn[0]=false;
 					wheelIdLimitation[0]=0;
+					for (int i = 0;i < instantSpeedSize;i++) {
+						instantTurnSpeed[0][i] = 0;
+					}
+					instantIdx[0] = 0;
 				}
 				if (wheelId1ControlOn)
 				{
 					_wheelControlOn[1]=false;
 					wheelInterruptOn[1]=false;
 					wheelIdLimitation[1]=0;
+					for (int i = 0;i < instantSpeedSize;i++) {
+						instantTurnSpeed[1][i] = 0;
+					}
+					instantIdx[1] = 0;
 				}
 				if (wheelId2ControlOn)
 				{
 					_wheelControlOn[2]=false;
 					wheelInterruptOn[2]=false;
 					wheelIdLimitation[2]=0;
+					for (int i = 0;i < instantSpeedSize;i++) {
+						instantTurnSpeed[2][i] = 0;
+					}
+					instantIdx[2] = 0;
 				}
 				if (wheelId3ControlOn)
 				{
 					_wheelControlOn[3]=false;
 					wheelInterruptOn[3]=false;
 					wheelIdLimitation[3]=0;
+					for (int i = 0;i < instantSpeedSize;i++) {
+						instantTurnSpeed[3][i] = 0;
+					}
+					instantIdx[3] = 0;
 				}
 				uint8_t countInt=0;
 				for (int i=0;i<4;i++)
@@ -345,13 +360,22 @@ float WheelControl::GetInstantTurnSpeed(uint8_t wheelId)
 {
 	float speed = 0;
 	unsigned long deltaTime = 0;
-	if (wheelInterrupt[wheelId] > instantSpeedSize) {
-		deltaTime=(instantTurnSpeed[wheelId][(instantIdx[wheelId] - 1) % instantSpeedSize] - instantTurnSpeed[wheelId][instantIdx[wheelId]]);
+	if (wheelInterrupt[wheelId] > instantSpeedSize) { // instantTurnSpeed[wheelId] is completed
+	//	deltaTime=(instantTurnSpeed[wheelId][(instantIdx[wheelId] - 1) % instantSpeedSize] - instantTurnSpeed[wheelId][instantIdx[wheelId]]);
+		deltaTime = (millis() - instantTurnSpeed[wheelId][instantIdx[wheelId]]);
+		deltaTime = deltaTime / (instantSpeedSize - 1);
 	}
-	deltaTime = deltaTime / (instantSpeedSize-1);
+	else {
+		deltaTime = (millis() - instantTurnSpeed[wheelId][wheelInterrupt[wheelId]]);
+		deltaTime = deltaTime / (wheelInterrupt[wheelId]);
+	}
+
 	if (deltaTime != 0) {
 		speed = (1000. / (deltaTime * wheelIdEncoderHoles[wheelId]));
 	}
+/*	Serial.print("-");
+	Serial.println(speed);
+	*/
 	return speed;
 }
 
@@ -468,12 +492,13 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 			}
 		}
 	
-		if (_pulseOn==true)
-		{
+	if (_pulseOn==true)
+	{
 			wheelPulseCount++;
 			if (wheelPulseCount>=wheelIdLimitation[0])
 			{
 				lastWheelInterruptId=5;
+				wheelIdLimitation[0] = 0;
 				noInterrupts(); // disable all interrupts
 				TCCR5A = 0;  // set entire TCCR5A register to 0
 				TCCR5B = 0;  // set entire TCCR5B register to 0
@@ -487,8 +512,8 @@ ISR(TIMER5_OVF_vect)        // timer interrupt used to regurarly check rotation
 #if defined(debugWheelControlOn)
 				Serial.print("Pulse reached:");
 				Serial.println(wheelPulseCount);
-	#endif
-				
+				delay(100);
+	#endif				
 				digitalWrite(softPinInterrupt,LOW);
 			}
 		}
